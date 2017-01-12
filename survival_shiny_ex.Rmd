@@ -1,0 +1,112 @@
+---
+title: "Survival Options"
+runtime: shiny
+output: html_document
+---
+  
+  An example of survival analysis and presentation using R shiny and markdown.
+
+```{r setup, include=FALSE, message= FALSE}
+# Some formatting of the survival library's cancer dataset
+library(survival)
+library(ggplot2)
+library(shiny)
+
+dat <- cancer
+
+# Using dataset descritions to do some initial formatting
+?survival::cancer
+
+dat$status <- ifelse(dat$status == 2, 1, 0)
+dat$sex <- factor(ifelse(dat$sex == 1, 'Male', 'Female'))
+dat$ph.ecog <- as.factor(dat$ph.ecog)
+
+table(dat$ph.karno) # I notice this score only took on the values of 50, 60, 70, 80, 90 and 100.
+# Since this score is also a subjective score, I made it into an ordered factor so that higher
+# scores indicate better performance of daily activities
+dat$ph.karno <- as.ordered(dat$ph.karno)
+dat$pat.karno <- as.ordered(dat$pat.karno)
+
+```
+
+```{r, echo=FALSE}
+
+### Need to add labels, titles and color and suppress warnings
+
+for (varnum in c(1:ncol(dat))){
+  if (class(dat[,varnum]) == 'numeric'){
+    hist(dat[,varnum], breaks = 50, main = paste('Histogram of', names(dat)[varnum]))
+  }
+  if ('factor' %in% class(dat[,varnum])){
+    barplot(table(dat[,varnum]))
+  }
+}
+
+```
+
+
+```{r, echo=FALSE}
+# Creating interacted cox model
+surv.obj <- Surv(time = dat$time, event = dat$status,
+                 type = "right")
+
+cox.model <- coxph(surv.obj ~ age*sex,
+                   dat,
+                   na.action = na.exclude)
+
+# Creating table for coefficients
+Interacted_table <- data.frame(summary(cox.model)$coefficients[,c(2,5)])
+names(Interacted_table) <- c("Hazard Ratio","P-Value")
+Interacted_table$Variable <- row.names(Interacted_table)
+row.names(Interacted_table) <- NULL
+
+shinyApp(
+  
+  ui <- fluidPage(
+    sidebarPanel(
+             tableOutput("interacted.table"),
+             checkboxGroupInput("plot.view", "Plot View", choices = c(levels(dat$sex)),
+                                selected = c(levels(dat$sex))),
+             sliderInput("age", "Age", min = min(dat$age), max = max(dat$age),
+                         value = median(dat$age)),
+             plotOutput("surv"),
+             width = 5),
+    mainPanel(
+      plotOutput("shoenfield", height = "800px"),
+      width = 7
+      )
+    ),
+
+  server <- function(input,output){
+    output$interacted.table1 <- renderTable(Interacted_table)
+    output$shoenfield <- renderPlot({layout(matrix(c(1:3), 3, 1, byrow = T))
+                                     titles = c("Age",
+                                                "Male",
+                                                "Age * Male")
+                                     for (i in c(1:3)){
+                                       plot(cox.zph(cox.model, transform = rank)[i],
+                                            ylim = c(-3,3),
+                                            se = F,
+                                            main = titles[i])
+                                       }
+                                    })
+    pattern <- reactive({data.frame(sex = input$plot.view,
+                                    age = input$age)
+                         })
+    fills <- reactive({colors()[as.numeric(as.factor(input$plot.view))*50]
+                       })
+    surv.plot.adj <- reactive({survfit(cox.model, newdata = pattern(), conf.int=F)
+                               })
+    output$surv <- renderPlot({plot(surv.plot.adj(), ylim = c(0,1), xlim = c(0,350), mark = NA,
+                                    col = fills(), main = "Interacted Cox Model Plots",
+                                    xlab = "Time",
+                                    ylab = "Survival Function")
+                               legend(100, 1, input$plot.view, lty = c(1,1), col = fills(), cex = 1)
+                               }, height = 500)
+
+    },
+  options = list(height = 500, width = 1300)
+)
+```
+
+
