@@ -1,10 +1,12 @@
 ---
-title: "Survival Options"
+title: "Survival Shiny Document"
 runtime: shiny
 output: html_document
 ---
   
-  An example of survival analysis and presentation using R shiny and markdown.
+## An example of survival analysis and presentation using R shiny and markdown.
+
+Using built in dataset "cancer", I replicate portions of R shiny app functionality for a project that I have done for work which showed the components and modelling process of survival analysis for customer churn. Here, we are dealing with something much more serious, which is lifetime expectancy of patients with advanced lung cancer from the North Central Cancer Treatment Group.
 
 ```{r setup, include=FALSE, message= FALSE}
 # Some formatting of the survival library's cancer dataset
@@ -27,30 +29,6 @@ table(dat$ph.karno) # I notice this score only took on the values of 50, 60, 70,
 dat$ph.karno <- as.ordered(dat$ph.karno)
 dat$pat.karno <- as.ordered(dat$pat.karno)
 
-```
-
-```{r, echo=FALSE}
-
-### Need to add labels, titles and color and suppress warnings
-
-layout(matrix(c(1:12), 3, 4, byrow = T))
-for (varnum in c(1:ncol(dat))){
-  if ('numeric' %in% class(dat[,varnum])){
-    hist(dat[,varnum],
-         breaks = 50,
-         main = paste('Histogram of', names(dat)[varnum]))
-    }
-  if ('factor' %in% class(dat[,varnum])){
-    barplot(table(dat[,varnum]))
-  }
-  }  
-
-
-```
-
-
-```{r, echo=FALSE}
-# Creating interacted cox model
 surv.obj <- Surv(time = dat$time, event = dat$status,
                  type = "right")
 
@@ -64,25 +42,56 @@ names(Interacted_table) <- c("Hazard Ratio","P-Value")
 Interacted_table$Variable <- row.names(Interacted_table)
 row.names(Interacted_table) <- NULL
 
+
+```
+
+### Step 1: EDA
+
+As all good analyses begin, here are the set of variables avaialble in the dataset plotted as histograms for continuous and barcharts for factors. 
+
+```{r, echo=FALSE}
+
+# Changing status to factor temporarily for frequency plotting
+dat$status <- factor(ifelse(dat$status == 1, 'Dead', 'Censored'))
+
+# Plotting out histograms and frequency charts
+layout(matrix(c(1:12), 3, 4, byrow = T))
+for (varnum in c(1:ncol(dat))){
+  if ('numeric' %in% class(dat[,varnum])){
+    hist(dat[,varnum],
+         breaks = 50,
+         main = paste('Histogram of', names(dat)[varnum]),
+         xlab = names(dat)[varnum])
+    }
+  if ('factor' %in% class(dat[,varnum])){
+    barplot(table(dat[,varnum]),
+            main = paste('Frequency of', names(dat)[varnum]))
+  }
+  }  
+
+
+```
+
+# Step 2: Dive right into a simple model
+
+For the purposes of showing what capabilities R shiny has with the survival library, I will make a simple interacted model of the hazards ratio of a cancer patient dying, conditional on their sex, age and the interaction of the two variables. The following cox proportional hazards model is:
+
+$$ log(h(t)_i) = \beta_0 + sex_i + age_i + sex_i*age_i $$
+
+The following outputs show the hazard ratios after exponentiating and the associated p-values along with a visual of shoenfeld residuals plotted with each term. These residuals show whether the estimated parameters fit the model for every time $$t$$ such that the proportional hazards ratio assumption is maintained.
+```{r, echo = F}
 shinyApp(
   
   ui <- fluidPage(
-    sidebarPanel(
-             tableOutput("interacted.table"),
-             checkboxGroupInput("plot.view", "Plot View", choices = c(levels(dat$sex)),
-                                selected = c(levels(dat$sex))),
-             sliderInput("age", "Age", min = min(dat$age), max = max(dat$age),
-                         value = median(dat$age)),
-             plotOutput("surv"),
-             width = 5),
     mainPanel(
-      plotOutput("shoenfield", height = "800px"),
+      tableOutput("interacted.table"),
+      plotOutput("shoenfield"),
       width = 7
       )
     ),
 
   server <- function(input,output){
-    output$interacted.table1 <- renderTable(Interacted_table)
+    output$interacted.table <- renderTable(Interacted_table)
     output$shoenfield <- renderPlot({layout(matrix(c(1:3), 3, 1, byrow = T))
                                      titles = c("Age",
                                                 "Male",
@@ -94,6 +103,32 @@ shinyApp(
                                             main = titles[i])
                                        }
                                     })
+    },
+  options = list(height = 550, width = 1000)
+)
+```
+
+### Step 3: Show how the predictions and predicted survival curves are affected by the predictors
+
+Here is a very simple, interactive visual that allows the user to select which sex(es) to plot predictions for and for what age value to plot the predictions from the previous interacted model.
+```{r, echo=FALSE}
+# Creating interacted cox model
+shinyApp(
+  
+  ui <- fluidPage(
+    sidebarPanel(
+             checkboxGroupInput("plot.view", "Plot View", choices = c(levels(dat$sex)),
+                                selected = c(levels(dat$sex))),
+             sliderInput("age", "Age", min = min(dat$age), max = max(dat$age),
+                         value = median(dat$age)),
+             width = 5),
+    mainPanel(
+      plotOutput("surv"),
+      width = 7
+      )
+    ),
+
+  server <- function(input,output){
     pattern <- reactive({data.frame(sex = input$plot.view,
                                     age = input$age)
                          })
@@ -105,11 +140,11 @@ shinyApp(
                                     col = fills(), main = "Interacted Cox Model Plots",
                                     xlab = "Time",
                                     ylab = "Survival Function")
-                               legend(100, 1, input$plot.view, lty = c(1,1), col = fills(), cex = 1)
+                               legend(270, 1, input$plot.view, lty = c(1,1), col = fills(), cex = 1)
                                }, height = 500)
 
     },
-  options = list(height = 500, width = 1300)
+  options = list(height = 500, width = 1000)
 )
 ```
 
