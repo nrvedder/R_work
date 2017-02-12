@@ -33,14 +33,18 @@ dat$pat.karno <- as.ordered(dat$pat.karno)
 
 ### Need to add labels, titles and color and suppress warnings
 
+layout(matrix(c(1:12), 3, 4, byrow = T))
 for (varnum in c(1:ncol(dat))){
-  if (class(dat[,varnum]) == 'numeric'){
-    hist(dat[,varnum], breaks = 50, main = paste('Histogram of', names(dat)[varnum]))
-  }
+  if ('numeric' %in% class(dat[,varnum])){
+    hist(dat[,varnum],
+         breaks = 50,
+         main = paste('Histogram of', names(dat)[varnum]))
+    }
   if ('factor' %in% class(dat[,varnum])){
     barplot(table(dat[,varnum]))
   }
-}
+  }  
+
 
 ```
 
