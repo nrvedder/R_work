@@ -76,7 +76,7 @@ for (varnum in c(1:ncol(dat))){
 
 For the purposes of showing what capabilities R shiny has with the survival library, I will make a simple interacted model of the hazards ratio of a cancer patient dying, conditional on their sex, age and the interaction of the two variables. The following cox proportional hazards model is:
 
-$$ \lambda(t|X_i) = \lambda_0(t) + \beta_1sex_i + \beta_2age_i + \beta_3(sex_i*age_i) $$
+$$ \lambda(t|X_i) = \lambda_0(t)exp(\beta_1sex_i + \beta_2age_i + \beta_3(sex_i*age_i)) $$
 
 The following outputs show the hazard ratios after exponentiating and the associated p-values along with a visual of shoenfeld residuals plotted with each term. These residuals show whether the estimated parameters fit the model for every time $$t$$ such that the proportional hazards ratio assumption is maintained.
 ```{r, echo = F}
